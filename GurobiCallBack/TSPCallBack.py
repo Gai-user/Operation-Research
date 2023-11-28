@@ -29,8 +29,7 @@ def MyCallBack(model, where):
         tour = subtour(x)
         if len(tour) < nodeNum:
             print('----add sub tour elimination constraints')
-            model.cbLazy(quicksum(model._vars[i, j] for i, j in itertools.permutations(tour, 2)) <= len(tour)-1)
-
+            model.cbLazy(quicksum(model._vars[i, j] for i, j in itertools.permutations(tour, 2)) <= len(tour) - 1)
 
 
 def subtour(x: dict):
