@@ -49,6 +49,7 @@ import sys
 project_root = "E:/OR/Solver"  # 根据实际情况修改路径
 sys.path.append(project_root)
 from utils import Node
+import numpy as np
 
 
 RLP = Model('relaxed MIP')
@@ -64,3 +65,121 @@ def Branch_And_Bound(model):
     model.optimize()
     global_UB = model.ObjVal
     global_LB = 0
+    eps = 1e-3
+    incumbent_node = None
+    Gap = np.inf
+
+    
+    """
+    Branch and Bound starts
+    """
+    Queue = []
+    node = Node()
+    node.local_LB = 0
+    node.local_UB = global_UB
+    node.model = model.copy()
+    node.model.setParam("OutputFlag", 0)
+    node.cnt = 0
+    Queue.append(node)
+
+    cnt = 0
+    global_UB_change = []
+    global_LB_change = []
+
+    while (len(Queue)>0 and global_UB - global_LB > eps):
+        current_node = Queue.pop()
+        cnt += 1
+        current_node.model.optimize()
+        Solution_status = current_node.model.Status
+
+        is_integer = True
+        is_pruned = False
+        if Solution_status == 2:  # 有最优解
+            for var in current_node.model.getVars():
+                current_node.x_sol[var.VarName] = var.x
+                print(var.VarName, " = ", var.x)
+                current_node.x_int_sol[var.VarName] = (int)(var.x)
+                if abs((int)(var.x) - var.x) >= eps:
+                    is_integer = False
+                    current_node.branch_var_list.append(var.VarName)
+            if is_integer: # 该节点的值为整数，更新节点上下界
+                is_pruned = True
+                current_node.is_integer = True
+                current_node.local_LB = current_node.model.ObjVal
+                current_node.local_UB = current_node.model.ObjVal
+                # 更新全局下界
+                if current_node.local_LB > global_LB:
+                    global_LB = current_node.local_LB
+                    incumbent_node = Node.deepcopy_node(current_node)
+            if not is_integer: # 该节点的解为非整数解
+                current_node.is_integer = False
+                current_node.local_UB = current_node.model.ObjVal
+                current_node.local_LB = 0
+                for var_name in current_node.x_int_sol.keys():
+                    var = current_node.model.getVarByName(var_name)
+                    # NOTE 更新节点下界 - 目标函数系数 * 圆整后的值
+                    current_node.local_LB += current_node.x_int_sol[var_name] * var.Obj
+                if (current_node.local_LB > global_LB) or (current_node.local_LB == global_LB and current_node.is_integer == True):
+                    global_LB = current_node.local_LB
+                    incumbent_node = Node.deepcopy_node(current_node)
+                    incumbent_node.local_LB = current_node.local_LB
+                    incumbent_node.local_UB = current_node.local_UB
+                    pass
+            
+            if not is_integer and current_node.local_UB < global_LB:
+                is_pruned = True
+            
+            Gap = round(100*(global_UB - global_LB) / global_LB, 2)
+            print('\n ---------------------------------------- \n', cnt, '\t Gap = ', Gap, ' %')
+        elif Solution_status != 2:
+            is_integer = False
+            is_pruned = True
+        
+        if not is_pruned:
+            branch_var_name = current_node.branch_var_list[0]
+            left_var_bound = (int)(current_node.x_sol[branch_var_name])
+            right_var_bound = (int)(current_node.x_sol[branch_var_name]) + 1
+
+            left_node = Node.deepcopy_node(current_node)
+            right_node = Node.deepcopy_node(current_node)
+
+            temp_var = left_node.model.getVarByName(branch_var_name)
+            left_node.model.addConstr(temp_var <= left_var_bound, name=f"branch_left_{cnt}")
+            left_node.model.setParam("OutputFlag", 0)
+            left_node.model.update()
+            cnt += 1
+            left_node.cnt = cnt
+
+            temp_var = right_node.model.getVarByName(branch_var_name)
+            right_node.model.addConstr(temp_var >= right_var_bound, name=f"branch_right_{cnt}")
+            right_node.model.setParam("OutputFlag", 0)
+            right_node.model.update()
+            cnt += 1
+            right_node.cnt = cnt
+
+            Queue.append(left_node)
+            Queue.append(right_node)
+
+            temp_global_UB = 0
+            for node in Queue:
+                node.model.optimize()
+                if node.model.status == 2:
+                    if node.model.ObjVal >= temp_global_UB:
+                        temp_global_UB = node.model.ObjVal
+            
+            global_UB = temp_global_UB
+            global_UB_change.append(global_UB)
+            global_LB_change.append(global_LB)
+    
+    Gap = round(100*(global_UB - global_LB) / global_LB, 2)
+    print('\n\n\n\n')
+    print(' ------------------------------------------- ')
+    print (' Branch, and Bound terminates ')
+    print(' Optimal solution found  ')
+    print ('-------------------------------------------')
+    print('\nFinal Gap = ', Gap, ' % ' )
+    print('Optimal Solution: ', incumbent_node.x_int_sol)
+    print("optimal Obj: ", global_LB)
+    return incumbent_node, Gap, global_UB_change, global_LB_change
+
+incumbent_node, Gap, Global_UB_change, Global_LB_change = Branch_And_Bound(RLP)
