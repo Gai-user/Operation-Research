@@ -15,7 +15,8 @@ add_executable(tsp_solver
             TSP/main.cpp
             TSP/GomoryHuTree.cpp
             TSP/ProData.cpp
-            TSP/ReaderTSP.cpp)
+            TSP/ReaderTSP.cpp
+            TSP/ConshdlrSubtour.cpp)
 
 # 包含头文件
 target_include_directories(tsp_solver PRIVATE
