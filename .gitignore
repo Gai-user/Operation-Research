@@ -1,2 +1,5 @@
 C++/include
 C++/cmake-build-*/
+SCIPLearn/
+.claude
+*build/
