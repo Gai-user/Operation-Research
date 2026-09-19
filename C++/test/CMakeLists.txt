@@ -8,7 +8,7 @@ FetchContent_MakeAvailable(googletest)
 
 include(GoogleTest)
 
-set(TEST_SOURCES TSPTest.cpp)
+set(TEST_SOURCES TSPTest.cpp SimplexTest.cpp)
 
 add_executable(ortest ${TEST_SOURCES})
 
