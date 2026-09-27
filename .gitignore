@@ -2,4 +2,6 @@ C++/include
 C++/cmake-build-*/
 SCIPLearn/
 .claude
+.vscode
 *build/
+Solver/
